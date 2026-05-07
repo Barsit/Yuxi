@@ -178,3 +178,101 @@ export const customProviderApi = {
     })
   }
 }
+
+// =============================================================================
+// === 自定义嵌入模型管理分组 ===
+// =============================================================================
+
+export const customEmbedModelApi = {
+  /**
+   * 获取所有自定义嵌入模型
+   * @returns {Promise} - 自定义嵌入模型列表
+   */
+  getCustomEmbedModels: async () => {
+    return apiAdminGet('/api/system/custom-embed-models')
+  },
+
+  /**
+   * 添加自定义嵌入模型
+   * @param {string} modelId - 模型标识符（如 custom/my-embed）
+   * @param {Object} modelData - 模型配置数据
+   * @returns {Promise} - 添加结果
+   */
+  addCustomEmbedModel: async (modelId, modelData) => {
+    return apiAdminPost('/api/system/custom-embed-models', {
+      model_id: modelId,
+      model_data: modelData
+    })
+  },
+
+  /**
+   * 更新自定义嵌入模型
+   * @param {string} modelId - 模型标识符
+   * @param {Object} modelData - 模型配置数据
+   * @returns {Promise} - 更新结果
+   */
+  updateCustomEmbedModel: async (modelId, modelData) => {
+    return apiAdminPut('/api/system/custom-embed-models', {
+      model_id: modelId,
+      model_data: modelData
+    })
+  },
+
+  /**
+   * 删除自定义嵌入模型
+   * @param {string} modelId - 模型标识符
+   * @returns {Promise} - 删除结果
+   */
+  deleteCustomEmbedModel: async (modelId) => {
+    return apiAdminDelete(`/api/system/custom-embed-models?model_id=${encodeURIComponent(modelId)}`)
+  }
+}
+
+// =============================================================================
+// === 自定义重排序模型管理分组 ===
+// =============================================================================
+
+export const customRerankerModelApi = {
+  /**
+   * 获取所有自定义重排序模型
+   * @returns {Promise} - 自定义重排序模型列表
+   */
+  getCustomRerankerModels: async () => {
+    return apiAdminGet('/api/system/custom-reranker-models')
+  },
+
+  /**
+   * 添加自定义重排序模型
+   * @param {string} modelId - 模型标识符（如 custom/my-reranker）
+   * @param {Object} modelData - 模型配置数据
+   * @returns {Promise} - 添加结果
+   */
+  addCustomRerankerModel: async (modelId, modelData) => {
+    return apiAdminPost('/api/system/custom-reranker-models', {
+      model_id: modelId,
+      model_data: modelData
+    })
+  },
+
+  /**
+   * 更新自定义重排序模型
+   * @param {string} modelId - 模型标识符
+   * @param {Object} modelData - 模型配置数据
+   * @returns {Promise} - 更新结果
+   */
+  updateCustomRerankerModel: async (modelId, modelData) => {
+    return apiAdminPut('/api/system/custom-reranker-models', {
+      model_id: modelId,
+      model_data: modelData
+    })
+  },
+
+  /**
+   * 删除自定义重排序模型
+   * @param {string} modelId - 模型标识符
+   * @returns {Promise} - 删除结果
+   */
+  deleteCustomRerankerModel: async (modelId) => {
+    return apiAdminDelete(`/api/system/custom-reranker-models?model_id=${encodeURIComponent(modelId)}`)
+  }
+}

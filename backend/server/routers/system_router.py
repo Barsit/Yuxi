@@ -3,7 +3,7 @@ import aiofiles
 from pathlib import Path
 
 import yaml
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from yuxi.storage.postgres.models_business import User
 from server.utils.auth_middleware import get_admin_user
@@ -321,3 +321,157 @@ async def test_custom_provider(
             "message": f"测试自定义供应商失败: {e}",
             "status": {"provider": provider_id, "model_name": model_name, "status": "error", "message": str(e)},
         }
+
+
+# =============================================================================
+# === 自定义嵌入模型管理分组 ===
+# =============================================================================
+
+
+@system.get("/custom-embed-models")
+async def get_custom_embed_models(current_user: User = Depends(get_admin_user)):
+    """获取所有自定义嵌入模型"""
+    try:
+        models = config.get_custom_embed_models()
+        return {
+            "models": {model_id: info.model_dump() for model_id, info in models.items()},
+            "message": "success",
+        }
+    except Exception as e:
+        logger.error(f"获取自定义嵌入模型失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取自定义嵌入模型失败: {str(e)}")
+
+
+@system.post("/custom-embed-models")
+async def add_custom_embed_model(
+    model_id: str = Body(..., description="模型标识符（如 custom/my-embed）"),
+    model_data: dict = Body(..., description="嵌入模型配置数据"),
+    current_user: User = Depends(get_admin_user),
+):
+    """添加自定义嵌入模型"""
+    try:
+        success = config.add_custom_embed_model(model_id, model_data)
+        if success:
+            return {"message": f"自定义嵌入模型 {model_id} 添加成功"}
+        else:
+            raise HTTPException(status_code=400, detail=f"嵌入模型ID {model_id} 已存在，请使用其他ID")
+    except Exception as e:
+        logger.error(f"添加自定义嵌入模型失败 {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"添加自定义嵌入模型失败: {str(e)}")
+
+
+@system.put("/custom-embed-models")
+async def update_custom_embed_model(
+    model_id: str = Body(..., description="模型标识符（如 custom/my-embed）"),
+    model_data: dict = Body(..., description="嵌入模型配置数据"),
+    current_user: User = Depends(get_admin_user),
+):
+    """更新自定义嵌入模型"""
+    try:
+        success = config.update_custom_embed_model(model_id, model_data)
+        if success:
+            return {"message": f"自定义嵌入模型 {model_id} 更新成功"}
+        else:
+            raise HTTPException(status_code=404, detail=f"自定义嵌入模型 {model_id} 不存在或更新失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新自定义嵌入模型失败 {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"更新自定义嵌入模型失败: {str(e)}")
+
+
+@system.delete("/custom-embed-models")
+async def delete_custom_embed_model(
+    model_id: str = Query(..., description="模型标识符（如 custom/my-embed）"),
+    current_user: User = Depends(get_admin_user),
+):
+    """删除自定义嵌入模型"""
+    try:
+        success = config.delete_custom_embed_model(model_id)
+        if success:
+            return {"message": f"自定义嵌入模型 {model_id} 删除成功"}
+        else:
+            raise HTTPException(status_code=404, detail=f"自定义嵌入模型 {model_id} 不存在或删除失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除自定义嵌入模型失败 {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"删除自定义嵌入模型失败: {str(e)}")
+
+
+# =============================================================================
+# === 自定义重排序模型管理分组 ===
+# =============================================================================
+
+
+@system.get("/custom-reranker-models")
+async def get_custom_reranker_models(current_user: User = Depends(get_admin_user)):
+    """获取所有自定义重排序模型"""
+    try:
+        models = config.get_custom_reranker_models()
+        return {
+            "models": {model_id: info.model_dump() for model_id, info in models.items()},
+            "message": "success",
+        }
+    except Exception as e:
+        logger.error(f"获取自定义重排序模型失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取自定义重排序模型失败: {str(e)}")
+
+
+@system.post("/custom-reranker-models")
+async def add_custom_reranker_model(
+    model_id: str = Body(..., description="模型标识符（如 custom/my-reranker）"),
+    model_data: dict = Body(..., description="重排序模型配置数据"),
+    current_user: User = Depends(get_admin_user),
+):
+    """添加自定义重排序模型"""
+    try:
+        success = config.add_custom_reranker_model(model_id, model_data)
+        if success:
+            return {"message": f"自定义重排序模型 {model_id} 添加成功"}
+        else:
+            raise HTTPException(status_code=400, detail=f"重排序模型ID {model_id} 已存在，请使用其他ID")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"添加自定义重排序模型失败 {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"添加自定义重排序模型失败: {str(e)}")
+
+
+@system.put("/custom-reranker-models")
+async def update_custom_reranker_model(
+    model_id: str = Body(..., description="模型标识符（如 custom/my-reranker）"),
+    model_data: dict = Body(..., description="重排序模型配置数据"),
+    current_user: User = Depends(get_admin_user),
+):
+    """更新自定义重排序模型"""
+    try:
+        success = config.update_custom_reranker_model(model_id, model_data)
+        if success:
+            return {"message": f"自定义重排序模型 {model_id} 更新成功"}
+        else:
+            raise HTTPException(status_code=404, detail=f"自定义重排序模型 {model_id} 不存在或更新失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新自定义重排序模型失败 {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"更新自定义重排序模型失败: {str(e)}")
+
+
+@system.delete("/custom-reranker-models")
+async def delete_custom_reranker_model(
+    model_id: str = Query(..., description="模型标识符（如 custom/my-reranker）"),
+    current_user: User = Depends(get_admin_user),
+):
+    """删除自定义重排序模型"""
+    try:
+        success = config.delete_custom_reranker_model(model_id)
+        if success:
+            return {"message": f"自定义重排序模型 {model_id} 删除成功"}
+        else:
+            raise HTTPException(status_code=404, detail=f"自定义重排序模型 {model_id} 不存在或删除失败")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除自定义重排序模型失败 {model_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"删除自定义重排序模型失败: {str(e)}")

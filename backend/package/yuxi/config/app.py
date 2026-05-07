@@ -184,7 +184,7 @@ class Config(BaseModel):
                 logger.warning(f"Skip invalid model provider config {provider}: {e}")
 
     def _load_custom_providers(self) -> None:
-        """从独立的TOML文件加载自定义供应商配置"""
+        """从独立的TOML文件加载自定义供应商配置（聊天/嵌入/重排序模型）"""
         custom_config_file = self._config_file.parent / "custom_providers.toml"
 
         if not custom_config_file.exists():
@@ -196,9 +196,17 @@ class Config(BaseModel):
             with open(custom_config_file, "rb") as f:
                 custom_config = tomli.load(f)
 
-            # 加载自定义供应商
+            # 加载自定义聊天模型供应商
             if "model_names" in custom_config:
                 self._load_custom_model_providers(custom_config["model_names"])
+
+            # 加载自定义嵌入模型
+            if "embed_model_names" in custom_config:
+                self._load_custom_embed_models(custom_config["embed_model_names"])
+
+            # 加载自定义重排序模型
+            if "reranker_names" in custom_config:
+                self._load_custom_reranker_models(custom_config["reranker_names"])
 
         except Exception as e:
             logger.error(f"Failed to load custom providers from {custom_config_file}: {e}")
@@ -212,6 +220,26 @@ class Config(BaseModel):
                 self.model_names[provider] = ChatModelProvider(**payload)
             except Exception as e:  # noqa: BLE001
                 logger.warning(f"Skip invalid custom provider {provider}: {e}")
+
+    def _load_custom_embed_models(self, embed_data: dict[str, Any]) -> None:
+        """加载自定义嵌入模型"""
+        for model_id, model_data in (embed_data or {}).items():
+            try:
+                payload = dict(model_data or {})
+                payload["custom"] = True
+                self.embed_model_names[model_id] = EmbedModelInfo(**payload)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Skip invalid custom embed model {model_id}: {e}")
+
+    def _load_custom_reranker_models(self, reranker_data: dict[str, Any]) -> None:
+        """加载自定义重排序模型"""
+        for model_id, model_data in (reranker_data or {}).items():
+            try:
+                payload = dict(model_data or {})
+                payload["custom"] = True
+                self.reranker_names[model_id] = RerankerInfo(**payload)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"Skip invalid custom reranker model {model_id}: {e}")
 
     def _handle_environment(self) -> None:
         """处理环境变量和运行时状态"""
@@ -554,15 +582,177 @@ class Config(BaseModel):
             return False
 
     def get_custom_providers(self) -> dict[str, ChatModelProvider]:
-        """获取所有自定义供应商
+        """获取所有自定义聊天模型供应商
 
         Returns:
             自定义供应商字典
         """
         return {k: v for k, v in self.model_names.items() if v.custom}
 
+    def get_custom_embed_models(self) -> dict[str, EmbedModelInfo]:
+        """获取所有自定义嵌入模型
+
+        Returns:
+            自定义嵌入模型字典
+        """
+        return {k: v for k, v in self.embed_model_names.items() if v.custom}
+
+    def get_custom_reranker_models(self) -> dict[str, RerankerInfo]:
+        """获取所有自定义重排序模型
+
+        Returns:
+            自定义重排序模型字典
+        """
+        return {k: v for k, v in self.reranker_names.items() if v.custom}
+
+    # ============================================================
+    # 自定义嵌入模型管理
+    # ============================================================
+
+    def add_custom_embed_model(self, model_id: str, model_data: dict[str, Any]) -> bool:
+        """添加自定义嵌入模型
+
+        Args:
+            model_id: 模型唯一标识符（如 custom/my-embed-model）
+            model_data: 模型配置数据
+
+        Returns:
+            是否添加成功
+        """
+        try:
+            if model_id in self.embed_model_names:
+                logger.error(f"Embed model ID already exists: {model_id}")
+                return False
+
+            model_data["custom"] = True
+            self.embed_model_names[model_id] = EmbedModelInfo(**model_data)
+            self._save_custom_providers()
+            logger.info(f"Added custom embed model: {model_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to add custom embed model {model_id}: {e}")
+            return False
+
+    def update_custom_embed_model(self, model_id: str, model_data: dict[str, Any]) -> bool:
+        """更新自定义嵌入模型（部分更新，只合并传入的字段）"""
+        try:
+            if model_id not in self.embed_model_names:
+                logger.error(f"Embed model not found: {model_id}")
+                return False
+
+            if not self.embed_model_names[model_id].custom:
+                logger.error(f"Cannot update non-custom embed model: {model_id}")
+                return False
+
+            existing = self.embed_model_names[model_id]
+            merged = existing.model_dump()
+            merged.update(model_data)
+            merged["custom"] = True
+            self.embed_model_names[model_id] = EmbedModelInfo(**merged)
+            self._save_custom_providers()
+            logger.info(f"Updated custom embed model: {model_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update custom embed model {model_id}: {e}")
+            return False
+
+    def delete_custom_embed_model(self, model_id: str) -> bool:
+        """删除自定义嵌入模型"""
+        try:
+            if model_id not in self.embed_model_names:
+                logger.error(f"Embed model not found: {model_id}")
+                return False
+
+            if not self.embed_model_names[model_id].custom:
+                logger.error(f"Cannot delete non-custom embed model: {model_id}")
+                return False
+
+            del self.embed_model_names[model_id]
+            self._save_custom_providers()
+            logger.info(f"Deleted custom embed model: {model_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete custom embed model {model_id}: {e}")
+            return False
+
+    # ============================================================
+    # 自定义重排序模型管理
+    # ============================================================
+
+    def add_custom_reranker_model(self, model_id: str, model_data: dict[str, Any]) -> bool:
+        """添加自定义重排序模型
+
+        Args:
+            model_id: 模型唯一标识符（如 custom/my-reranker）
+            model_data: 模型配置数据
+
+        Returns:
+            是否添加成功
+        """
+        try:
+            if model_id in self.reranker_names:
+                logger.error(f"Reranker model ID already exists: {model_id}")
+                return False
+
+            model_data["custom"] = True
+            self.reranker_names[model_id] = RerankerInfo(**model_data)
+            self._save_custom_providers()
+            logger.info(f"Added custom reranker model: {model_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to add custom reranker model {model_id}: {e}")
+            return False
+
+    def update_custom_reranker_model(self, model_id: str, model_data: dict[str, Any]) -> bool:
+        """更新自定义重排序模型（部分更新，只合并传入的字段）"""
+        try:
+            if model_id not in self.reranker_names:
+                logger.error(f"Reranker model not found: {model_id}")
+                return False
+
+            if not self.reranker_names[model_id].custom:
+                logger.error(f"Cannot update non-custom reranker model: {model_id}")
+                return False
+
+            existing = self.reranker_names[model_id]
+            merged = existing.model_dump()
+            merged.update(model_data)
+            merged["custom"] = True
+            self.reranker_names[model_id] = RerankerInfo(**merged)
+            self._save_custom_providers()
+            logger.info(f"Updated custom reranker model: {model_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to update custom reranker model {model_id}: {e}")
+            return False
+
+    def delete_custom_reranker_model(self, model_id: str) -> bool:
+        """删除自定义重排序模型"""
+        try:
+            if model_id not in self.reranker_names:
+                logger.error(f"Reranker model not found: {model_id}")
+                return False
+
+            if not self.reranker_names[model_id].custom:
+                logger.error(f"Cannot delete non-custom reranker model: {model_id}")
+                return False
+
+            del self.reranker_names[model_id]
+            self._save_custom_providers()
+            logger.info(f"Deleted custom reranker model: {model_id}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to delete custom reranker model {model_id}: {e}")
+            return False
+
     def _save_custom_providers(self) -> None:
-        """保存自定义供应商到独立配置文件"""
+        """保存自定义供应商（聊天/嵌入/重排序模型）到独立配置文件"""
         if not self._config_file:
             logger.warning("Config file path not set")
             return
@@ -570,14 +760,28 @@ class Config(BaseModel):
         custom_config_file = self._config_file.parent / "custom_providers.toml"
 
         try:
-            # 获取所有自定义供应商
+            # 获取所有自定义聊天供应商
             custom_providers = self.get_custom_providers()
+
+            # 获取所有自定义嵌入模型
+            custom_embed_models = self.get_custom_embed_models()
+
+            # 获取所有自定义重排序模型
+            custom_reranker_models = self.get_custom_reranker_models()
 
             # 创建配置数据
             custom_config = {}
             if custom_providers:
                 custom_config["model_names"] = {
-                    provider: info.model_dump() for provider, info in custom_providers.items()
+                    provider: info.model_dump(exclude_none=True) for provider, info in custom_providers.items()
+                }
+            if custom_embed_models:
+                custom_config["embed_model_names"] = {
+                    model_id: info.model_dump(exclude_none=True) for model_id, info in custom_embed_models.items()
+                }
+            if custom_reranker_models:
+                custom_config["reranker_names"] = {
+                    model_id: info.model_dump(exclude_none=True) for model_id, info in custom_reranker_models.items()
                 }
 
             # 确保目录存在

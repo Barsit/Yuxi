@@ -91,6 +91,112 @@
 
     <a-divider />
 
+    <!-- 自定义嵌入模型 -->
+    <div class="custom-models-section">
+      <div class="section-header">
+        <div class="section-subtitle">自定义嵌入模型</div>
+        <a-button type="primary" @click="openAddCustomEmbedModal" class="add-btn lucide-icon-btn">
+          <template #icon><Plus :size="16" /></template>
+          添加自定义嵌入模型
+        </a-button>
+      </div>
+      <p class="section-description">添加自定义嵌入模型，用于知识库的向量化处理。支持 OpenAI 兼容的 Embedding API。</p>
+
+      <div class="custom-provider-card" v-for="(model, modelId) in customEmbedModels" :key="modelId">
+        <div class="card-header">
+          <div class="provider-info">
+            <h4>{{ model.name || modelId }}</h4>
+            <span class="provider-id">ID: {{ modelId }}</span>
+          </div>
+          <div class="provider-actions">
+            <a-button type="text" size="small" class="lucide-icon-btn" @click="openEditCustomEmbedModal(modelId, model)">
+              <template #icon><Pencil :size="14" /></template>
+              编辑
+            </a-button>
+            <a-popconfirm title="确定要删除这个自定义嵌入模型吗？" @confirm="deleteCustomEmbedModel(modelId)" ok-text="确定" cancel-text="取消">
+              <a-button type="text" size="small" danger class="lucide-icon-btn">
+                <template #icon><Trash2 :size="14" /></template>
+                删除
+              </a-button>
+            </a-popconfirm>
+          </div>
+        </div>
+        <div class="card-content">
+          <div class="provider-details">
+            <div class="detail-item">
+              <span class="label">API地址</span>
+              <span class="value">{{ model.base_url }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">维度</span>
+              <span class="value">{{ model.dimension }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">模型ID</span>
+              <span class="value">{{ model.model_id || modelId }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="Object.keys(customEmbedModels).length === 0" class="empty-state">
+        <a-empty description="暂无自定义嵌入模型" />
+      </div>
+    </div>
+
+    <a-divider />
+
+    <!-- 自定义重排序模型 -->
+    <div class="custom-models-section">
+      <div class="section-header">
+        <div class="section-subtitle">自定义重排序模型</div>
+        <a-button type="primary" @click="openAddCustomRerankerModal" class="add-btn lucide-icon-btn">
+          <template #icon><Plus :size="16" /></template>
+          添加自定义重排序模型
+        </a-button>
+      </div>
+      <p class="section-description">
+        添加自定义重排序（Reranker）模型，用于对知识库检索结果进行精排。支持 OpenAI 兼容的 Rerank API。
+      </p>
+
+      <div class="custom-provider-card" v-for="(model, modelId) in customRerankerModels" :key="modelId">
+        <div class="card-header">
+          <div class="provider-info">
+            <h4>{{ model.name || modelId }}</h4>
+            <span class="provider-id">ID: {{ modelId }}</span>
+          </div>
+          <div class="provider-actions">
+            <a-button type="text" size="small" class="lucide-icon-btn" @click="openEditCustomRerankerModal(modelId, model)">
+              <template #icon><Pencil :size="14" /></template>
+              编辑
+            </a-button>
+            <a-popconfirm title="确定要删除这个自定义重排序模型吗？" @confirm="deleteCustomRerankerModel(modelId)" ok-text="确定" cancel-text="取消">
+              <a-button type="text" size="small" danger class="lucide-icon-btn">
+                <template #icon><Trash2 :size="14" /></template>
+                删除
+              </a-button>
+            </a-popconfirm>
+          </div>
+        </div>
+        <div class="card-content">
+          <div class="provider-details">
+            <div class="detail-item">
+              <span class="label">API地址</span>
+              <span class="value">{{ model.base_url }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">模型名称</span>
+              <span class="value">{{ model.name }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="Object.keys(customRerankerModels).length === 0" class="empty-state">
+        <a-empty description="暂无自定义重排序模型" />
+      </div>
+    </div>
+
+    <a-divider />
+
     <!-- 系统内置供应商 -->
     <div class="builtin-providers-section">
       <div class="section-header">
@@ -376,6 +482,131 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 自定义嵌入模型配置弹窗 -->
+    <a-modal
+      v-model:open="customEmbedModal.visible"
+      :title="customEmbedModal.isEdit ? '编辑自定义嵌入模型' : '添加自定义嵌入模型'"
+      @ok="saveCustomEmbedModel"
+      @cancel="cancelCustomEmbedModel"
+      :okText="'保存'"
+      :cancelText="'取消'"
+      :ok-type="'primary'"
+      :width="600"
+      :confirmLoading="customEmbedModal.loading"
+    >
+      <a-form
+        ref="customEmbedForm"
+        :model="customEmbedModal.data"
+        :rules="customEmbedRules"
+        layout="vertical"
+      >
+        <a-form-item label="模型标识符" name="modelId" v-if="!customEmbedModal.isEdit">
+          <a-input
+            v-model:value="customEmbedModal.data.modelId"
+            placeholder="如：custom/my-embed-model"
+            :disabled="customEmbedModal.isEdit"
+          />
+        </a-form-item>
+
+        <a-form-item label="显示名称" name="name">
+          <a-input
+            v-model:value="customEmbedModal.data.name"
+            placeholder="如：My Embedding Model"
+          />
+        </a-form-item>
+
+        <a-form-item label="API 地址" name="base_url">
+          <a-input
+            v-model:value="customEmbedModal.data.base_url"
+            placeholder="如：https://api.example.com/v1/embeddings"
+          />
+        </a-form-item>
+
+        <a-form-item label="向量维度" name="dimension">
+          <a-input-number
+            v-model:value="customEmbedModal.data.dimension"
+            :min="64"
+            :max="8192"
+            style="width: 100%"
+            placeholder="如：1024"
+          />
+        </a-form-item>
+
+        <a-form-item label="API 密钥" name="api_key">
+          <a-input
+            v-model:value="customEmbedModal.data.api_key"
+            placeholder="请输入 API 密钥或环境变量名"
+          />
+        </a-form-item>
+
+        <a-form-item label="模型名称（可选）" name="model_id">
+          <a-input
+            v-model:value="customEmbedModal.data.model_id"
+            placeholder="默认为模型标识符"
+          />
+        </a-form-item>
+
+        <a-form-item label="批量大小（可选）" name="batch_size">
+          <a-input-number
+            v-model:value="customEmbedModal.data.batch_size"
+            :min="1"
+            :max="200"
+            style="width: 100%"
+            placeholder="默认为 40"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 自定义重排序模型配置弹窗 -->
+    <a-modal
+      v-model:open="customRerankerModal.visible"
+      :title="customRerankerModal.isEdit ? '编辑自定义重排序模型' : '添加自定义重排序模型'"
+      @ok="saveCustomRerankerModel"
+      @cancel="cancelCustomRerankerModel"
+      :okText="'保存'"
+      :cancelText="'取消'"
+      :ok-type="'primary'"
+      :width="600"
+      :confirmLoading="customRerankerModal.loading"
+    >
+      <a-form
+        ref="customRerankerForm"
+        :model="customRerankerModal.data"
+        :rules="customRerankerRules"
+        layout="vertical"
+      >
+        <a-form-item label="模型标识符" name="modelId" v-if="!customRerankerModal.isEdit">
+          <a-input
+            v-model:value="customRerankerModal.data.modelId"
+            placeholder="如：custom/my-reranker"
+            :disabled="customRerankerModal.isEdit"
+          />
+        </a-form-item>
+
+        <a-form-item label="显示名称" name="name">
+          <a-input
+            v-model:value="customRerankerModal.data.name"
+            placeholder="如：My Reranker Model"
+          />
+        </a-form-item>
+
+        <a-form-item label="API 地址" name="base_url">
+          <a-input
+            v-model:value="customRerankerModal.data.base_url"
+            placeholder="如：https://api.example.com/v1/rerank"
+          />
+        </a-form-item>
+
+        <a-form-item label="API 密钥" name="api_key">
+          <a-input
+            v-model:value="customRerankerModal.data.api_key"
+            placeholder="请输入 API 密钥或环境变量名"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -395,7 +626,7 @@ import {
 import { useConfigStore } from '@/stores/config'
 import { modelIcons } from '@/utils/modelIcon'
 import { agentApi } from '@/apis/agent_api'
-import { customProviderApi } from '@/apis/system_api'
+import { customProviderApi, customEmbedModelApi, customRerankerModelApi } from '@/apis/system_api'
 
 const configStore = useConfigStore()
 
@@ -407,6 +638,18 @@ const modelStatus = computed(() => configStore.config?.model_provider_status)
 const customProviders = computed(() => {
   const providers = configStore.config?.model_names || {}
   return Object.fromEntries(Object.entries(providers).filter(([, value]) => value.custom === true))
+})
+
+// 自定义嵌入模型
+const customEmbedModels = computed(() => {
+  const models = configStore.config?.embed_model_names || {}
+  return Object.fromEntries(Object.entries(models).filter(([, value]) => value.custom === true))
+})
+
+// 自定义重排序模型
+const customRerankerModels = computed(() => {
+  const models = configStore.config?.reranker_names || {}
+  return Object.fromEntries(Object.entries(models).filter(([, value]) => value.custom === true))
 })
 
 // 提供商配置相关状态
@@ -794,10 +1037,230 @@ const testCustomProvider = async (providerId, modelName) => {
     })
   }
 }
+
+// =============================================================================
+// 自定义嵌入模型管理
+// =============================================================================
+
+const customEmbedForm = ref()
+const customEmbedModal = reactive({
+  visible: false,
+  isEdit: false,
+  loading: false,
+  data: {
+    modelId: '',
+    name: '',
+    base_url: '',
+    dimension: 1024,
+    api_key: '',
+    model_id: '',
+    batch_size: 40
+  }
+})
+
+const customEmbedRules = {
+  modelId: [
+    { required: true, message: '请输入模型标识符', trigger: 'blur' },
+    {
+      validator: (_rule, value) => {
+        if (!value) return Promise.resolve()
+        if (/^[a-zA-Z0-9_.\/-]+$/.test(value.trim())) {
+          return Promise.resolve()
+        }
+        return Promise.reject('标识符只能包含字母、数字、下划线、点号、斜线和横线')
+      },
+      trigger: 'blur'
+    }
+  ],
+  name: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
+  base_url: [{ required: true, message: '请输入 API 地址', trigger: 'blur' }],
+  dimension: [{ required: true, message: '请输入向量维度', trigger: 'blur' }],
+  api_key: [{ required: true, message: '请输入 API 密钥', trigger: 'blur' }]
+}
+
+const openAddCustomEmbedModal = () => {
+  customEmbedModal.visible = true
+  customEmbedModal.isEdit = false
+  customEmbedModal.data = {
+    modelId: '',
+    name: '',
+    base_url: '',
+    dimension: 1024,
+    api_key: '',
+    model_id: '',
+    batch_size: 40
+  }
+  customEmbedForm.value?.resetFields()
+}
+
+const openEditCustomEmbedModal = (modelId, model) => {
+  customEmbedModal.visible = true
+  customEmbedModal.isEdit = true
+  customEmbedModal.data = {
+    modelId: modelId,
+    name: model.name || '',
+    base_url: model.base_url || '',
+    dimension: model.dimension || 1024,
+    api_key: model.api_key || '',
+    model_id: model.model_id || '',
+    batch_size: model.batch_size || 40
+  }
+}
+
+const saveCustomEmbedModel = async () => {
+  try {
+    await customEmbedForm.value.validate()
+    customEmbedModal.loading = true
+
+    const modelData = {
+      name: customEmbedModal.data.name,
+      base_url: customEmbedModal.data.base_url,
+      dimension: customEmbedModal.data.dimension,
+      api_key: customEmbedModal.data.api_key,
+      model_id: customEmbedModal.data.model_id || undefined,
+      batch_size: customEmbedModal.data.batch_size || 40
+    }
+
+    if (customEmbedModal.isEdit) {
+      await customEmbedModelApi.updateCustomEmbedModel(customEmbedModal.data.modelId, modelData)
+      message.success('自定义嵌入模型更新成功')
+    } else {
+      await customEmbedModelApi.addCustomEmbedModel(customEmbedModal.data.modelId, modelData)
+      message.success('自定义嵌入模型添加成功')
+    }
+
+    customEmbedModal.visible = false
+    await configStore.refreshConfig()
+  } catch (error) {
+    if (error.errorFields) return
+    message.error(`操作失败: ${error.response?.data?.detail || error.message || '未知错误'}`)
+  } finally {
+    customEmbedModal.loading = false
+  }
+}
+
+const cancelCustomEmbedModel = () => {
+  customEmbedModal.visible = false
+  customEmbedForm.value?.resetFields()
+}
+
+const deleteCustomEmbedModel = async (modelId) => {
+  try {
+    await customEmbedModelApi.deleteCustomEmbedModel(modelId)
+    message.success('自定义嵌入模型删除成功')
+    await configStore.refreshConfig()
+  } catch (error) {
+    message.error(`删除失败: ${error.message || error.response?.data?.detail || '未知错误'}`)
+  }
+}
+
+// =============================================================================
+// 自定义重排序模型管理
+// =============================================================================
+
+const customRerankerForm = ref()
+const customRerankerModal = reactive({
+  visible: false,
+  isEdit: false,
+  loading: false,
+  data: {
+    modelId: '',
+    name: '',
+    base_url: '',
+    api_key: ''
+  }
+})
+
+const customRerankerRules = {
+  modelId: [
+    { required: true, message: '请输入模型标识符', trigger: 'blur' },
+    {
+      validator: (_rule, value) => {
+        if (!value) return Promise.resolve()
+        if (/^[a-zA-Z0-9_.\/-]+$/.test(value.trim())) {
+          return Promise.resolve()
+        }
+        return Promise.reject('标识符只能包含字母、数字、下划线、点号、斜线和横线')
+      },
+      trigger: 'blur'
+    }
+  ],
+  name: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
+  base_url: [{ required: true, message: '请输入 API 地址', trigger: 'blur' }],
+  api_key: [{ required: true, message: '请输入 API 密钥', trigger: 'blur' }]
+}
+
+const openAddCustomRerankerModal = () => {
+  customRerankerModal.visible = true
+  customRerankerModal.isEdit = false
+  customRerankerModal.data = {
+    modelId: '',
+    name: '',
+    base_url: '',
+    api_key: ''
+  }
+  customRerankerForm.value?.resetFields()
+}
+
+const openEditCustomRerankerModal = (modelId, model) => {
+  customRerankerModal.visible = true
+  customRerankerModal.isEdit = true
+  customRerankerModal.data = {
+    modelId: modelId,
+    name: model.name || '',
+    base_url: model.base_url || '',
+    api_key: model.api_key || ''
+  }
+}
+
+const saveCustomRerankerModel = async () => {
+  try {
+    await customRerankerForm.value.validate()
+    customRerankerModal.loading = true
+
+    const modelData = {
+      name: customRerankerModal.data.name,
+      base_url: customRerankerModal.data.base_url,
+      api_key: customRerankerModal.data.api_key
+    }
+
+    if (customRerankerModal.isEdit) {
+      await customRerankerModelApi.updateCustomRerankerModel(customRerankerModal.data.modelId, modelData)
+      message.success('自定义重排序模型更新成功')
+    } else {
+      await customRerankerModelApi.addCustomRerankerModel(customRerankerModal.data.modelId, modelData)
+      message.success('自定义重排序模型添加成功')
+    }
+
+    customRerankerModal.visible = false
+    await configStore.refreshConfig()
+  } catch (error) {
+    if (error.errorFields) return
+    message.error(`操作失败: ${error.response?.data?.detail || error.message || '未知错误'}`)
+  } finally {
+    customRerankerModal.loading = false
+  }
+}
+
+const cancelCustomRerankerModel = () => {
+  customRerankerModal.visible = false
+  customRerankerForm.value?.resetFields()
+}
+
+const deleteCustomRerankerModel = async (modelId) => {
+  try {
+    await customRerankerModelApi.deleteCustomRerankerModel(modelId)
+    message.success('自定义重排序模型删除成功')
+    await configStore.refreshConfig()
+  } catch (error) {
+    message.error(`删除失败: ${error.message || error.response?.data?.detail || '未知错误'}`)
+  }
+}
 </script>
 
 <style lang="less" scoped>
-.custom-providers-section {
+.custom-providers-section,
+.custom-models-section {
   margin-bottom: 24px;
   .custom-provider-card {
     border: 1px solid var(--gray-200);

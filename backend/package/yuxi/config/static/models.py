@@ -31,6 +31,7 @@ class EmbedModelInfo(BaseModel):
     api_key: str = Field(..., description="API Key 或环境变量名")
     model_id: str | None = Field(None, description="可选的模型 ID")
     batch_size: int = Field(40, description="批量向量化大小")
+    custom: bool = Field(default=False, description="是否为自定义嵌入模型")
 
 
 class RerankerInfo(BaseModel):
@@ -39,6 +40,7 @@ class RerankerInfo(BaseModel):
     name: str = Field(..., description="模型名称")
     base_url: str = Field(..., description="API 基础 URL")
     api_key: str = Field(..., description="API Key 或环境变量名")
+    custom: bool = Field(default=False, description="是否为自定义重排序模型")
 
 
 # ============================================================
